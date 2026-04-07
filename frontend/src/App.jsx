@@ -14,6 +14,11 @@ export default function App() {
   const [file, setFile] = useState(null);
   const [ordered, setOrdered] = useState(false);
 
+  // Edit state
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', price: '', description: '', stock: '' });
+  const [editFile, setEditFile] = useState(null);
+
   useEffect(() => { fetchProducts(); fetchCart(); }, []);
 
   function fetchProducts(q = '') {
@@ -63,6 +68,32 @@ export default function App() {
     setTimeout(() => { setOrdered(false); setCart([]); setPage('products'); }, 2500);
   }
 
+  function startEdit(p) {
+    setEditId(p._id);
+    setEditForm({ name: p.name, price: p.price, description: p.description, stock: p.stock });
+    setEditFile(null);
+  }
+
+  function cancelEdit() { setEditId(null); setEditFile(null); }
+
+  function handleUpdateProduct(e, id) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append('name', editForm.name);
+    fd.append('price', editForm.price);
+    fd.append('description', editForm.description);
+    fd.append('stock', editForm.stock);
+    if (editFile) fd.append('image', editFile);
+    axios.put(`${PRODUCT_API}/products/${id}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(() => { setEditId(null); setEditFile(null); fetchProducts(); });
+  }
+
+  function handleDeleteProduct(id) {
+    if (!window.confirm('Delete this product?')) return;
+    axios.delete(`${PRODUCT_API}/products/${id}`).then(() => fetchProducts());
+  }
+
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
   const grandTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -100,13 +131,13 @@ export default function App() {
                   <img src={`${PRODUCT_API}/products/${item.productId}/image`} width="60" height="60" style={{ objectFit: 'cover', borderRadius: 6 }} alt={item.name} />
                 </td>
                 <td style={{ padding: '10px 12px' }}><strong>{item.name}</strong></td>
-                <td style={{ padding: '10px 12px' }}>₹{item.price}</td>
+                <td style={{ padding: '10px 12px' }}>&#8377;{item.price}</td>
                 <td style={{ padding: '10px 12px' }}>
                   <button onClick={() => changeCartQty(item, -1)}>−</button>
                   <span style={{ margin: '0 10px' }}>{item.quantity}</span>
                   <button onClick={() => changeCartQty(item, 1)}>+</button>
                 </td>
-                <td style={{ padding: '10px 12px' }}>₹{(item.price * item.quantity).toFixed(2)}</td>
+                <td style={{ padding: '10px 12px' }}>&#8377;{(item.price * item.quantity).toFixed(2)}</td>
                 <td style={{ padding: '10px 12px' }}>
                   <button onClick={() => removeFromCart(item.productId)}>Remove</button>
                 </td>
@@ -116,7 +147,7 @@ export default function App() {
           <tfoot>
             <tr style={{ borderTop: '2px solid #eee' }}>
               <td colSpan={4} style={{ padding: '14px 12px', textAlign: 'right', fontWeight: 600 }}>Grand Total:</td>
-              <td style={{ padding: '14px 12px', fontWeight: 700, fontSize: '1.05rem' }}>₹{grandTotal.toFixed(2)}</td>
+              <td style={{ padding: '14px 12px', fontWeight: 700, fontSize: '1.05rem' }}>&#8377;{grandTotal.toFixed(2)}</td>
               <td style={{ padding: '14px 12px' }}>
                 <button onClick={handlePayNow}>💳 Pay Now</button>
               </td>
@@ -153,8 +184,69 @@ export default function App() {
             <img src={`${PRODUCT_API}/products/${p._id}/image`} width="100%" height="150" style={{ objectFit: 'cover' }} alt={p.name} />
             <h3>{p.name}</h3>
             <p>{p.description}</p>
-            <p>₹{p.price} | Stock: {p.stock}</p>
-            {p.stock === 0 ? <p>Out of Stock</p> : (
+            <p>&#8377;{p.price} | Stock: {p.stock}</p>
+
+            {/* Edit / Delete action buttons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <button
+                onClick={() => startEdit(p)}
+                style={{ background: '#f0ad4e', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' }}>
+                ✏️ Edit
+              </button>
+              <button
+                onClick={() => handleDeleteProduct(p._id)}
+                style={{ background: '#d9534f', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' }}>
+                🗑️ Delete
+              </button>
+            </div>
+
+            {/* Inline edit form */}
+            {editId === p._id && (
+              <form
+                onSubmit={e => handleUpdateProduct(e, p._id)}
+                style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #eee', paddingTop: 8 }}>
+                <input
+                  placeholder="Name"
+                  value={editForm.name}
+                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                  required />
+                <input
+                  type="number"
+                  placeholder="Price"
+                  value={editForm.price}
+                  onChange={e => setEditForm({ ...editForm, price: e.target.value })}
+                  required />
+                <input
+                  placeholder="Description"
+                  value={editForm.description}
+                  onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                <input
+                  type="number"
+                  placeholder="Stock"
+                  value={editForm.stock}
+                  onChange={e => setEditForm({ ...editForm, stock: e.target.value })}
+                  required />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setEditFile(e.target.files[0])} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="submit"
+                    style={{ background: '#5cb85c', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 4, cursor: 'pointer' }}>
+                    💾 Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    style={{ padding: '4px 12px', borderRadius: 4, cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {p.stock === 0 ? <p style={{ marginTop: 8 }}>Out of Stock</p> : (
               <>
                 <button onClick={() => setQty(p._id, (quantities[p._id] || 1) - 1, p.stock)}>−</button>
                 <input type="number" min="1" max={p.stock} value={quantities[p._id] || 1}

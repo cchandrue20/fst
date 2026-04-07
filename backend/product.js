@@ -47,9 +47,16 @@ app.get('/products/:id/image', (req, res) => {
   });
 });
 
-app.put('/products/:id', (req, res) => {
-  Product.findByIdAndUpdate(req.params.id, { stock: req.body.stock }, { new: true })
+app.put('/products/:id', upload.single('image'), (req, res) => {
+  const { name, price, description, stock } = req.body;
+  const update = { name, price: Number(price), description, stock: Number(stock) };
+  if (req.file) { update.image = req.file.buffer; update.imageType = req.file.mimetype; }
+  Product.findByIdAndUpdate(req.params.id, update, { new: true })
     .then(p => res.json(p));
+});
+
+app.delete('/products/:id', (req, res) => {
+  Product.findByIdAndDelete(req.params.id).then(() => res.json({ ok: true }));
 });
 
 app.listen(3002, () => console.log('Product service on 3002'));
